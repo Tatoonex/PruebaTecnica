@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Regresión de Inicio de Sesión</title>
+<style>
+  :root {
+    --fondo: #0f1115;
+    --panel: #171a21;
+    --borde: #2a2e37;
+    --texto: #e8e9ec;
+    --tenue: #8a8f98;
+    --acento: #4f7cff;
+    --acento-hover: #3d67e8;
+    --exito: #2fbf71;
+    --fallo: #e5484d;
+    --pendiente: #e8b93f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--fondo);
+    color: var(--texto);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 48px 16px;
+  }
+  .contenedor { width: 100%; max-width: 640px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .subtitulo { color: var(--tenue); font-size: 14px; margin: 0 0 32px; }
+
+  .boton-ejecutar {
+    width: 100%;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 10px;
+    background: var(--acento);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: background 0.15s ease;
+  }
+  .boton-ejecutar:hover:not(:disabled) { background: var(--acento-hover); }
+  .boton-ejecutar:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .girador {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: girar 0.7s linear infinite;
+    display: none;
+  }
+  .boton-ejecutar.cargando .girador { display: inline-block; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+
+  .resultados { margin-top: 28px; display: flex; flex-direction: column; gap: 12px; }
+  .tarjeta {
+    background: var(--panel);
+    border: 1px solid var(--borde);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .insignia {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    margin-top: 1px;
+  }
+  .insignia.pendiente { background: rgba(232,185,63,0.15); color: var(--pendiente); }
+  .insignia.aprobada { background: rgba(47,191,113,0.15); color: var(--exito); }
+  .insignia.fallida { background: rgba(229,72,77,0.15); color: var(--fallo); }
+
+  .cuerpo-tarjeta { flex: 1; min-width: 0; }
+  .titulo-tarjeta { font-weight: 600; font-size: 14.5px; }
+  .meta-tarjeta { font-size: 12.5px; color: var(--tenue); margin-top: 2px; }
+  .error-tarjeta {
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: var(--fallo);
+    background: rgba(229,72,77,0.08);
+    border: 1px solid rgba(229,72,77,0.25);
+    border-radius: 6px;
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .resumen {
+    margin-top: 20px;
+    font-size: 13.5px;
+    color: var(--tenue);
+    text-align: center;
+  }
+  .resumen.ok { color: var(--exito); }
+  .resumen.mal { color: var(--fallo); }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <h1>Regresión de Inicio de Sesión — saucedemo.com</h1>
+  <p class="subtitulo">Un clic ejecuta los dos casos (válido e inválido) en un navegador visible.</p>
+
+  <button id="botonEjecutar" class="boton-ejecutar">
+    <span class="girador"></span>
+    <span id="textoBoton">▶ Ejecutar prueba</span>
+  </button>
+
+  <div id="elementoResultados" class="resultados"></div>
+  <div id="elementoResumen" class="resumen oculto"></div>
+</div>
+
+<script>
+  const botonEjecutar = document.getElementById('botonEjecutar');
+  const textoBoton = document.getElementById('textoBoton');
+  const elementoResultados = document.getElementById('elementoResultados');
+  const elementoResumen = document.getElementById('elementoResumen');
+
+  const CASOS = [
+    { clave: 'true', etiqueta: 'Inicio de sesión true (credenciales válidas)' },
+    { clave: 'false', etiqueta: 'Inicio de sesión false (credenciales inválidas)' },
+  ];
+
+  const ESTADOS = { passed: 'aprobada', failed: 'fallida', pending: 'pendiente', unknown: 'desconocida' };
+
+  function renderizarPendiente() {
+    elementoResultados.innerHTML = CASOS.map(c => htmlTarjeta({ titulo: c.etiqueta, estado: 'pending' })).join('');
+    elementoResumen.className = 'resumen oculto';
+  }
+
+  function htmlTarjeta({ titulo, estado, duracion, error }) {
+    const clase = ESTADOS[estado] || 'desconocida';
+    const icono = estado === 'passed' ? '✓' : estado === 'failed' ? '✕' : '…';
+    const metaTexto = estado === 'pending'
+      ? 'Ejecutando…'
+      : estado === 'passed'
+        ? `Pasó en ${duracion}ms`
+        : estado === 'failed'
+          ? `Falló en ${duracion || 0}ms`
+          : 'Sin datos';
+    const errorHtml = error ? `<div class="error-tarjeta">${escaparHtml(error)}</div>` : '';
+    return `
+      <div class="tarjeta">
+        <div class="insignia ${clase}">${icono}</div>
+        <div class="cuerpo-tarjeta">
+          <div class="titulo-tarjeta">${escaparHtml(titulo)}</div>
+          <div class="meta-tarjeta">${metaTexto}</div>
+          ${errorHtml}
+        </div>
+      </div>`;
+  }
+
+  function escaparHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function coincidirCaso(titulo) {
+    const t = titulo.toLowerCase();
+    return CASOS.find(c => t.includes(c.clave))?.etiqueta || titulo;
+  }
+
+  async function ejecutarPruebas() {
+    botonEjecutar.disabled = true;
+    botonEjecutar.classList.add('cargando');
+    textoBoton.textContent = 'Ejecutando…';
+    renderizarPendiente();
+
+    try {
+      const respuesta = await fetch('/api/ejecutar', { method: 'POST' });
+      const datos = await respuesta.json();
+
+      if (!datos.exito) {
+        elementoResultados.innerHTML = `<div class="tarjeta"><div class="insignia fallida">✕</div><div class="cuerpo-tarjeta">
+          <div class="titulo-tarjeta">Error al ejecutar la prueba</div>
+          <div class="error-tarjeta">${escaparHtml(datos.error || 'Error desconocido')}</div>
+        </div></div>`;
+        elementoResumen.textContent = 'No se pudo completar la ejecución.';
+        elementoResumen.className = 'resumen mal';
+        return;
+      }
+
+      elementoResultados.innerHTML = datos.pruebas.map(p => htmlTarjeta({
+        titulo: coincidirCaso(p.titulo),
+        estado: p.estado,
+        duracion: p.duracion,
+        error: p.error,
+      })).join('');
+
+      const todasAprobadas = datos.pruebas.every(p => p.estado === 'passed');
+      elementoResumen.textContent = todasAprobadas
+        ? `Regresión completa: ${datos.pruebas.length} pruebas pasaron correctamente.`
+        : `Regresión completa: ${datos.pruebas.filter(p => p.estado === 'passed').length}/${datos.pruebas.length} pruebas pasaron.`;
+      elementoResumen.className = 'resumen ' + (todasAprobadas ? 'ok' : 'mal');
+    } catch (e) {
+      elementoResultados.innerHTML = `<div class="tarjeta"><div class="insignia fallida">✕</div><div class="cuerpo-tarjeta">
+        <div class="titulo-tarjeta">No se pudo conectar con el servidor</div>
+        <div class="error-tarjeta">${escaparHtml(e.message)}</div>
+      </div></div>`;
+    } finally {
+      botonEjecutar.disabled = false;
+      botonEjecutar.classList.remove('cargando');
+      textoBoton.textContent = '▶ Ejecutar prueba';
+      elementoResumen.classList.remove('oculto');
+    }
+  }
+
+  botonEjecutar.addEventListener('click', ejecutarPruebas);
+</script>
+</body>
+</html>

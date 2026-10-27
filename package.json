@@ -1,0 +1,21 @@
+{
+  "name": "prueba-login-espanol",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:visible": "playwright test --headed",
+    "test:inicio-sesion": "playwright test tests/inicio-sesion.spec.js --headed --project=chromium",
+    "test:api": "playwright test --project=api",
+    "panel": "node servidor.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5"
+  }
+}
